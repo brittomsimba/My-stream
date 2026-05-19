@@ -1,9 +1,10 @@
-// My-Stream Configuration
+// My-Stream Configuration with YouTube API
 const CONFIG = {
-  BACKEND_URL: 'https://naijared.com',
+  YOUTUBE_API_KEY: 'YOUR_YOUTUBE_API_KEY_HERE', // Get from: https://console.cloud.google.com/
   APP_NAME: 'My-Stream',
   VERSION: '1.0.0',
   CACHE_EXPIRY: 3600000, // 1 hour in milliseconds
+  DEFAULT_SEARCH: 'popular videos', // Default search term on load
 };
 
 // Local Storage Keys
@@ -17,6 +18,7 @@ const STORAGE_KEYS = {
 let currentPlayer = null;
 let currentVideo = null;
 let videosCache = [];
+let nextPageToken = '';
 
 // Initialize App
 window.addEventListener('DOMContentLoaded', () => {
@@ -28,41 +30,119 @@ async function initializeApp() {
     console.log('Initializing My-Stream...');
     const statusText = document.getElementById('status-text');
     
-    // Test connection to backend
-    statusText.textContent = 'Connecting to naijared.com...';
+    // Check if API key is set
+    if (CONFIG.YOUTUBE_API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE') {
+      statusText.textContent = 'YouTube API key not configured. Using demo videos. See README for setup.';
+      await loadDemoVideos();
+      showApp();
+      return;
+    }
     
-    const connected = await testConnection();
+    // Test YouTube API connection
+    statusText.textContent = 'Connecting to YouTube API...';
+    
+    const connected = await testYouTubeConnection();
     
     if (connected) {
-      statusText.textContent = 'Loading videos...';
-      await loadVideos();
+      statusText.textContent = 'Loading videos from YouTube...';
+      await searchYouTube(CONFIG.DEFAULT_SEARCH);
       showApp();
     } else {
-      statusText.textContent = 'Failed to connect to server. Check your connection and try again.';
-      document.getElementById('retry-btn').classList.remove('hidden');
+      statusText.textContent = 'Failed to connect to YouTube API. Using demo videos.';
+      await loadDemoVideos();
+      showApp();
     }
   } catch (error) {
     console.error('Initialization error:', error);
     document.getElementById('status-text').textContent = 'Error: ' + error.message;
-    document.getElementById('retry-btn').classList.remove('hidden');
+    await loadDemoVideos();
+    showApp();
   }
 }
 
-async function testConnection() {
+async function testYouTubeConnection() {
   try {
-    const response = await fetch(CONFIG.BACKEND_URL, {
-      method: 'HEAD',
-      mode: 'no-cors',
-      timeout: 5000,
-    });
-    return true;
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&type=video&key=${CONFIG.YOUTUBE_API_KEY}`,
+      { method: 'GET' }
+    );
+    return response.ok;
   } catch (error) {
-    console.warn('Connection test failed:', error);
+    console.warn('YouTube API connection test failed:', error);
     return false;
   }
 }
 
-async function loadVideos() {
+async function searchYouTube(query, pageToken = '') {
+  try {
+    const loader = document.getElementById('loader');
+    const emptyState = document.getElementById('empty-state');
+    const videoGrid = document.getElementById('video-grid');
+    
+    if (!pageToken) {
+      loader.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      videoGrid.innerHTML = '';
+    }
+    
+    const url = new URL('https://www.googleapis.com/youtube/v3/search');
+    url.searchParams.append('part', 'snippet');
+    url.searchParams.append('q', query);
+    url.searchParams.append('maxResults', '20');
+    url.searchParams.append('type', 'video');
+    url.searchParams.append('key', CONFIG.YOUTUBE_API_KEY);
+    
+    if (pageToken) {
+      url.searchParams.append('pageToken', pageToken);
+    }
+    
+    console.log('Searching YouTube for:', query);
+    const response = await fetch(url.toString());
+    
+    if (!response.ok) {
+      throw new Error(`YouTube API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const videos = formatYouTubeVideos(data.items || []);
+    
+    nextPageToken = data.nextPageToken || '';
+    
+    if (pageToken) {
+      videosCache = [...videosCache, ...videos];
+    } else {
+      videosCache = videos;
+    }
+    
+    if (videosCache.length === 0) {
+      emptyState.classList.remove('hidden');
+    } else {
+      renderVideos(videos, !pageToken);
+    }
+    
+    loader.classList.add('hidden');
+  } catch (error) {
+    console.error('Error searching YouTube:', error);
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('loader').classList.add('hidden');
+  }
+}
+
+function formatYouTubeVideos(items) {
+  return items.map((item) => ({
+    id: item.id.videoId,
+    title: item.snippet.title,
+    uploader: item.snippet.channelTitle,
+    thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+    url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+    views: 'N/A',
+    duration: 'N/A',
+    description: item.snippet.description,
+    channelId: item.snippet.channelId,
+  }));
+}
+
+async function loadDemoVideos() {
   try {
     const loader = document.getElementById('loader');
     const emptyState = document.getElementById('empty-state');
@@ -72,23 +152,7 @@ async function loadVideos() {
     emptyState.classList.add('hidden');
     videoGrid.innerHTML = '';
     
-    // Attempt to fetch from backend
-    let videos = [];
-    try {
-      const response = await fetch(`${CONFIG.BACKEND_URL}/api/videos`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        videos = data.videos || [];
-      }
-    } catch (error) {
-      console.warn('Backend fetch failed, using demo videos:', error);
-      videos = getDemoVideos();
-    }
-    
+    const videos = getDemoVideos();
     videosCache = videos;
     
     if (videos.length === 0) {
@@ -99,50 +163,53 @@ async function loadVideos() {
     
     loader.classList.add('hidden');
   } catch (error) {
-    console.error('Error loading videos:', error);
+    console.error('Error loading demo videos:', error);
     document.getElementById('empty-state').classList.remove('hidden');
   }
 }
 
 function getDemoVideos() {
-  // Demo videos for testing - replace with real data from backend
+  // Demo videos for testing
   return [
     {
-      id: '1',
-      title: 'Welcome to My-Stream',
+      id: 'dQw4w9WgXcQ',
+      title: 'Welcome to My-Stream - YouTube Integration',
       uploader: 'My-Stream Team',
       thumbnail: 'https://images.unsplash.com/photo-1505228395891-9a51e7e86e81?w=300&h=170&fit=crop',
-      url: 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/BigBuckBunny.mp4',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       views: '1.2M',
-      duration: '9:56',
-      description: 'Welcome to My-Stream! This is a sample video. Connect naijared.com as your backend to load real videos.',
+      duration: '3:33',
+      description: 'Welcome to My-Stream with YouTube API integration! Connect a real YouTube API key to load live videos.',
     },
     {
-      id: '2',
-      title: 'Sample Video 2',
+      id: 'jNQXAC9IVRw',
+      title: 'Sample Video 2 - Demo Mode',
       uploader: 'Demo Channel',
       thumbnail: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&h=170&fit=crop',
-      url: 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ElephantsDream.mp4',
+      url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
       views: '856K',
       duration: '2:47',
-      description: 'This is a demo video. Replace with real content from your backend.',
+      description: 'This is a demo video. Get a YouTube API key to load real videos.',
     },
     {
-      id: '3',
-      title: 'Sample Video 3',
+      id: '9bZkp7q19f0',
+      title: 'Sample Video 3 - YouTube API Demo',
       uploader: 'Content Creator',
       thumbnail: 'https://images.unsplash.com/photo-1498038432885-ccd8e8c352e5?w=300&h=170&fit=crop',
-      url: 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerBlazes.mp4',
+      url: 'https://www.youtube.com/watch?v=9bZkp7q19f0',
       views: '2.1M',
       duration: '3:34',
-      description: 'Demo content for testing. Configure naijared.com API for production videos.',
+      description: 'Demo content for testing. Set up YouTube API in config for production.',
     },
   ];
 }
 
-function renderVideos(videos) {
+function renderVideos(videos, clear = true) {
   const videoGrid = document.getElementById('video-grid');
-  videoGrid.innerHTML = '';
+  
+  if (clear) {
+    videoGrid.innerHTML = '';
+  }
   
   videos.forEach((video) => {
     const videoItem = document.createElement('div');
@@ -174,7 +241,10 @@ function playVideo(video) {
   document.getElementById('p-views').textContent = `${video.views} views`;
   document.getElementById('p-description').innerHTML = `<p class="text-sm text-gray-300">${video.description || 'No description available.'}</p>`;
   
-  vidPlayer.src = video.url;
+  // Embed YouTube video
+  const embedUrl = `https://www.youtube.com/embed/${video.id}?autoplay=1`;
+  vidPlayer.innerHTML = `<iframe width="100%" height="100%" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  
   playerOverlay.style.display = 'flex';
   
   // Add to history
@@ -184,63 +254,63 @@ function playVideo(video) {
 function closePlayer() {
   document.getElementById('player-overlay').style.display = 'none';
   document.getElementById('mini-player').style.display = 'none';
-  document.getElementById('vid-player').pause();
+  document.getElementById('vid-player').innerHTML = '';
 }
 
 function minimizePlayer() {
   document.getElementById('player-overlay').style.display = 'none';
   const miniPlayer = document.getElementById('mini-player');
-  const vidPlayer = document.getElementById('vid-player');
-  const miniVidPlayer = document.getElementById('mini-vid-player');
+  const miniTitle = document.getElementById('mini-title');
+  const miniUploader = document.getElementById('mini-uploader');
+  
+  if (currentVideo) {
+    miniTitle.textContent = currentVideo.title;
+    miniUploader.textContent = currentVideo.uploader;
+  }
   
   miniPlayer.style.display = 'block';
-  miniVidPlayer.src = vidPlayer.src;
-  miniVidPlayer.currentTime = vidPlayer.currentTime;
-  miniVidPlayer.play();
 }
 
 function expandPlayer() {
   document.getElementById('player-overlay').style.display = 'flex';
   document.getElementById('mini-player').style.display = 'none';
-  const vidPlayer = document.getElementById('vid-player');
-  const miniVidPlayer = document.getElementById('mini-vid-player');
-  vidPlayer.currentTime = miniVidPlayer.currentTime;
-  vidPlayer.play();
 }
 
 function toggleMiniPlay() {
-  const miniVidPlayer = document.getElementById('mini-vid-player');
-  const miniPlayIcon = document.getElementById('mini-play-icon');
-  
-  if (miniVidPlayer.paused) {
-    miniVidPlayer.play();
-    miniPlayIcon.className = 'fas fa-pause text-sm';
-  } else {
-    miniVidPlayer.pause();
-    miniPlayIcon.className = 'fas fa-play text-sm';
-  }
+  // YouTube embed auto-plays, just toggle mini player visibility
+  showToast('Playing in mini player');
 }
 
 function runSearch() {
-  const query = document.getElementById('q-input').value.toLowerCase();
+  const query = document.getElementById('q-input').value.trim();
   
   if (!query) {
-    renderVideos(videosCache);
+    loadDemoVideos();
     return;
   }
   
-  const filtered = videosCache.filter((video) =>
-    video.title.toLowerCase().includes(query) ||
-    video.uploader.toLowerCase().includes(query) ||
-    video.description?.toLowerCase().includes(query)
-  );
-  
-  renderVideos(filtered);
+  // If YouTube API is configured, search YouTube
+  if (CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
+    searchYouTube(query);
+  } else {
+    // Otherwise search in demo videos
+    const filtered = videosCache.filter((video) =>
+      video.title.toLowerCase().includes(query) ||
+      video.uploader.toLowerCase().includes(query) ||
+      video.description?.toLowerCase().includes(query)
+    );
+    renderVideos(filtered);
+  }
 }
 
 function goHome() {
   document.getElementById('q-input').value = '';
-  loadVideos();
+  
+  if (CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
+    searchYouTube(CONFIG.DEFAULT_SEARCH);
+  } else {
+    loadDemoVideos();
+  }
 }
 
 function loadSubs() {
@@ -350,7 +420,8 @@ function clearSubs() {
 }
 
 function showAbout() {
-  alert(`${CONFIG.APP_NAME} v${CONFIG.VERSION}\n\nA modern video streaming platform.\n\nBackend: ${CONFIG.BACKEND_URL}`);
+  const apiStatus = CONFIG.YOUTUBE_API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE' ? 'Not configured' : 'Configured';
+  alert(`${CONFIG.APP_NAME} v${CONFIG.VERSION}\n\nA modern video streaming platform with YouTube integration.\n\nYouTube API: ${apiStatus}`);
 }
 
 function openDlPopup() {
@@ -362,30 +433,20 @@ function closeDlPopup() {
 }
 
 function startDownload() {
-  showToast('Download preparation started');
-  document.getElementById('dl-start-btn').classList.add('hidden');
-  document.getElementById('dl-progress').classList.remove('hidden');
-  document.getElementById('dl-save-btn').classList.remove('hidden');
-  document.getElementById('dl-audio-btn').classList.remove('hidden');
-}
-
-function saveFile() {
-  if (!currentVideo) return;
-  const fileName = document.getElementById('dl-name').value || currentVideo.title;
-  const link = document.createElement('a');
-  link.href = currentVideo.url;
-  link.download = `${fileName}.mp4`;
-  link.click();
-  showToast('Download started');
+  showToast('Download not available for YouTube videos');
   closeDlPopup();
 }
 
+function saveFile() {
+  showToast('Download not available for YouTube videos');
+}
+
 function extractAudio() {
-  showToast('Audio extraction not available in demo mode');
+  showToast('Audio extraction not available for YouTube videos');
 }
 
 function saveAudioFile() {
-  showToast('Audio save not available in demo mode');
+  showToast('Audio save not available for YouTube videos');
 }
 
 function openSharePopup() {
@@ -400,7 +461,6 @@ function prepareShare() {
   document.getElementById('share-prepare-btn').classList.add('hidden');
   document.getElementById('share-progress').classList.remove('hidden');
   document.getElementById('share-file-btn').classList.remove('hidden');
-  document.getElementById('share-audio-btn').classList.remove('hidden');
 }
 
 function shareFile() {
@@ -408,8 +468,8 @@ function shareFile() {
   if (navigator.share) {
     navigator.share({
       title: currentVideo.title,
-      text: `Check out: ${currentVideo.title}`,
-      url: window.location.href,
+      text: `Check out: ${currentVideo.title} on My-Stream`,
+      url: currentVideo.url,
     });
   } else {
     copyLink();
@@ -417,35 +477,35 @@ function shareFile() {
 }
 
 function extractAudioShare() {
-  showToast('Audio extraction not available in demo mode');
+  showToast('Audio extraction not available for YouTube videos');
 }
 
 function copyLink() {
-  const url = `${window.location.href}?video=${currentVideo?.id || ''}`;
-  navigator.clipboard.writeText(url);
-  showToast('Link copied to clipboard');
+  if (!currentVideo) return;
+  navigator.clipboard.writeText(currentVideo.url);
+  showToast('YouTube link copied to clipboard');
 }
 
 function shareToTwitter() {
   if (!currentVideo) return;
   const text = `Check out: ${currentVideo.title} on My-Stream`;
-  const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(currentVideo.url)}`;
   window.open(url, '_blank');
 }
 
 function shareToWhatsApp() {
   if (!currentVideo) return;
-  const text = `Check out: ${currentVideo.title} on My-Stream`;
+  const text = `Check out: ${currentVideo.title} ${currentVideo.url}`;
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank');
 }
 
 function shareNative() {
-  if (navigator.share) {
+  if (navigator.share && currentVideo) {
     navigator.share({
-      title: currentVideo?.title || 'My-Stream',
+      title: currentVideo.title,
       text: 'Check this out on My-Stream',
-      url: window.location.href,
+      url: currentVideo.url,
     });
   }
 }
@@ -466,3 +526,15 @@ function showToast(message) {
     toast.remove();
   }, 3000);
 }
+
+// Load more videos on scroll
+window.addEventListener('scroll', () => {
+  if (
+    window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 &&
+    nextPageToken &&
+    CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE'
+  ) {
+    const query = document.getElementById('q-input').value || CONFIG.DEFAULT_SEARCH;
+    searchYouTube(query, nextPageToken);
+  }
+});
