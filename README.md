@@ -1,89 +1,70 @@
-# My-Stream
+# My-Stream - YouTube Video Platform
 
-A modern video streaming platform built with HTML, CSS, and JavaScript.
+A modern video streaming platform powered by YouTube API.
 
-## Features
+## 🎬 Features
 
-- 🎬 Video streaming and playback
-- 🔍 Search functionality
-- 📚 Watch history and saved videos
-- 🔔 Subscriptions
-- 📥 Video download (demo mode)
-- 📤 Share videos
-- 🎨 Modern dark theme UI
-- 📱 Fully responsive design
-- ⚡ Fast and lightweight
+- 🔍 **Search YouTube**: Search any video from YouTube
+- 📺 **Stream Videos**: Watch YouTube videos embedded directly
+- ❤️ **Save Videos**: Save your favorite videos locally
+- 📜 **Watch History**: Automatic watch history tracking
+- 🔔 **Subscriptions**: Subscribe to favorite channels
+- 📱 **Responsive Design**: Works on desktop, tablet, and mobile
+- 🌙 **Dark Theme**: Modern dark interface
+- ♾️ **Infinite Scroll**: Automatically load more videos
+- 📤 **Share**: Share videos on Twitter, WhatsApp, or copy link
+- ⚡ **Fast**: Lightweight and optimized
 
-## Backend Integration
+## 🚀 Quick Start
 
-This project is configured to use **naijared.com** as the backend server for videos.
+### Option 1: GitHub Pages (Recommended)
 
-### Backend API Requirements
+1. Go to: https://github.com/brittomsimba/My-stream
+2. Go to **Settings** → **Pages**
+3. Select `main` branch as source
+4. Your site will be live at: `https://brittomsimba.github.io/My-stream`
 
-To integrate a custom backend, it should provide:
+### Option 2: Local Development
 
-```
-GET /api/videos
+```bash
+# Clone the repository
+git clone https://github.com/brittomsimba/My-stream.git
+cd My-stream
 
-Response format:
-{
-  "videos": [
-    {
-      "id": "1",
-      "title": "Video Title",
-      "uploader": "Channel Name",
-      "thumbnail": "https://...",
-      "url": "https://...",
-      "views": "1.2M",
-      "duration": "9:56",
-      "description": "Video description"
-    }
-  ]
-}
+# Serve with Python
+python -m http.server 8000
+
+# Or with Node.js
+npx http-server
 ```
 
-## Quick Start
+Then open: `http://localhost:8000`
 
-### Local Development
+## ⚙️ Configuration
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/brittomsimba/My-stream.git
-   cd My-stream
-   ```
+The app uses **YouTube API v3** for all video content.
 
-2. Serve the files locally:
-   ```bash
-   # Using Python 3
-   python -m http.server 8000
-   
-   # Or using Node.js (with http-server)
-   npx http-server
-   ```
+### API Key Status
+- ✅ **Active API Key**: `AIzaSyC2M4wChKNkxsxXj9w0eibUgN65JVXw4dk`
+- ✅ **Daily Quota**: 10,000 units
+- ✅ **Ready to Use**: No additional setup needed
 
-3. Open in browser:
-   ```
-   http://localhost:8000
-   ```
+### Customization
 
-### Configuration
-
-Edit `scripts/MyStream.js` to configure:
+Edit `scripts/MyStream.js` to customize:
 
 ```javascript
 const CONFIG = {
-  BACKEND_URL: 'https://naijared.com',  // Change backend URL
-  APP_NAME: 'My-Stream',                 // Change app name
+  YOUTUBE_API_KEY: 'AIzaSyC2M4wChKNkxsxXj9w0eibUgN65JVXw4dk',
+  APP_NAME: 'My-Stream',
   VERSION: '1.0.0',
-  CACHE_EXPIRY: 3600000,                 // Cache expiry in ms
+  DEFAULT_SEARCH: 'popular videos',
 };
 ```
 
-## Customization
-
 ### Colors
 
-Edit `styles/MyStream.css` to change colors:
+Edit `styles/MyStream.css` to change theme:
 
 ```css
 :root {
@@ -93,79 +74,112 @@ Edit `styles/MyStream.css` to change colors:
 }
 ```
 
-### App Name
-
-Change in `index.html` and `scripts/MyStream.js`
-
-## File Structure
+## 📁 File Structure
 
 ```
 My-stream/
-├── index.html           # Main HTML file
+├── index.html              # Main HTML file
 ├── styles/
-│   └── MyStream.css     # Stylesheet
+│   └── MyStream.css        # Stylesheet
 ├── scripts/
-│   └── MyStream.js      # Application logic
-├── README.md            # This file
-└── .gitignore          # Git ignore file
+│   └── MyStream.js         # Application logic
+├── README.md               # Documentation
+└── .gitignore             # Git ignore
 ```
 
-## Features Explained
+## 🎯 How to Use
 
-### Video Playing
-- Click any video to play it in full screen
-- Use native HTML5 video controls
+### Search Videos
+1. Use the search bar at the top
+2. Type any video title, artist, or topic
+3. Results load automatically
+
+### Watch Videos
+1. Click on any video thumbnail
+2. Video plays in full-screen player
+3. Use YouTube's native controls
+
+### Save Videos
+1. While watching, click "Save" button
+2. Video is saved to your library
+3. Access from "Library" → "Saved Videos"
+
+### Track History
+- All watched videos are automatically saved
+- Access from "Library" → "Watch History"
+- Shows last 50 videos watched
+
+### Subscribe to Channels
+1. While watching a video, click "Subscribe"
+2. Subscribe to that channel
+3. Access subscriptions from "Library"
+
+### Share Videos
+1. Click "Share" while watching
+2. Choose sharing method:
+   - Twitter
+   - WhatsApp
+   - Copy Link
+   - Native Share (mobile)
+
+## 📱 Features Explained
+
+### Infinite Scroll
+- Scroll down to automatically load more videos
+- Seamless browsing experience
+- Loads 20 videos at a time
+
+### Mini Player
 - Minimize to picture-in-picture mode
+- Continue browsing while watching
+- Expand to full screen anytime
 
-### Search
-- Search across video titles, uploaders, and descriptions
-- Real-time filtering
+### Watch History
+- Stores last 50 videos watched
+- Automatic timestamping
+- Never lose your place
 
-### Library
-- **Watch History**: Automatically tracks watched videos
-- **Saved Videos**: Manually save videos for later
-- **Subscriptions**: Subscribe to channels
-
-### Storage
-- All data stored locally in browser (localStorage)
-- No server-side account needed
+### Local Storage
+- All data saved locally in your browser
+- No account needed
 - Data persists across sessions
 
-## Deployment
+## 🔧 Troubleshooting
 
-### GitHub Pages
+### Videos not loading?
+1. Check internet connection
+2. Open browser console (F12) for errors
+3. Refresh the page
 
-1. Push to GitHub (already done)
-2. Go to repository Settings → Pages
-3. Select `main` branch as source
-4. Your site will be available at: `https://brittomsimba.github.io/My-stream`
+### Search not working?
+1. Make sure you have internet connection
+2. YouTube API key might have quota exceeded
+3. Try again later
 
-### Other Platforms
+### Videos not playing?
+1. Ensure JavaScript is enabled
+2. Try a different browser
+3. Clear browser cache and reload
 
-- **Vercel**: Connect GitHub repo directly
-- **Netlify**: Drag and drop or connect GitHub
-- **Any static hosting**: Just upload the files
+## 📊 YouTube API Information
 
-## Troubleshooting
+- **API Used**: YouTube Data API v3
+- **Rate Limit**: 10,000 units per day
+- **Cost per Search**: ~100 units
+- **Capacity**: ~100 searches per day
 
-### Videos not loading
-1. Check if naijared.com is accessible
-2. Open browser console (F12) for error messages
-3. Try demo videos by checking the fallback in console
-
-### Backend connection failed
-- Check your internet connection
-- Verify naijared.com URL in CONFIG
-- Check browser console for CORS errors
-
-## License
+## 📄 License
 
 MIT License - Feel free to use and modify
 
-## Support
+## 🙋 Support
 
-For issues and questions, please create an issue on GitHub.
+- Report issues on GitHub
+- Check browser console for errors
+- Ensure YouTube API key is active
 
 ---
 
 **Made with ❤️ by brittomsimba**
+
+Live Demo: https://brittomsimba.github.io/My-stream
