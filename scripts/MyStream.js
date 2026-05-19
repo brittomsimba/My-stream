@@ -1,6 +1,6 @@
 // My-Stream Configuration with YouTube API
 const CONFIG = {
-  YOUTUBE_API_KEY: 'YOUR_YOUTUBE_API_KEY_HERE', // Get from: https://console.cloud.google.com/
+  YOUTUBE_API_KEY: 'AIzaSyC2M4wChKNkxsxXj9w0eibUgN65JVXw4dk',
   APP_NAME: 'My-Stream',
   VERSION: '1.0.0',
   CACHE_EXPIRY: 3600000, // 1 hour in milliseconds
@@ -19,6 +19,7 @@ let currentPlayer = null;
 let currentVideo = null;
 let videosCache = [];
 let nextPageToken = '';
+let currentSearchQuery = '';
 
 // Initialize App
 window.addEventListener('DOMContentLoaded', () => {
@@ -27,36 +28,24 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function initializeApp() {
   try {
-    console.log('Initializing My-Stream...');
+    console.log('Initializing My-Stream with YouTube API...');
     const statusText = document.getElementById('status-text');
     
-    // Check if API key is set
-    if (CONFIG.YOUTUBE_API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE') {
-      statusText.textContent = 'YouTube API key not configured. Using demo videos. See README for setup.';
-      await loadDemoVideos();
-      showApp();
-      return;
-    }
-    
-    // Test YouTube API connection
-    statusText.textContent = 'Connecting to YouTube API...';
+    statusText.textContent = 'Loading videos from YouTube...';
     
     const connected = await testYouTubeConnection();
     
     if (connected) {
-      statusText.textContent = 'Loading videos from YouTube...';
       await searchYouTube(CONFIG.DEFAULT_SEARCH);
       showApp();
     } else {
-      statusText.textContent = 'Failed to connect to YouTube API. Using demo videos.';
-      await loadDemoVideos();
-      showApp();
+      statusText.textContent = 'Failed to connect to YouTube API. Check your connection and try again.';
+      document.getElementById('retry-btn').classList.remove('hidden');
     }
   } catch (error) {
     console.error('Initialization error:', error);
     document.getElementById('status-text').textContent = 'Error: ' + error.message;
-    await loadDemoVideos();
-    showApp();
+    document.getElementById('retry-btn').classList.remove('hidden');
   }
 }
 
@@ -83,6 +72,8 @@ async function searchYouTube(query, pageToken = '') {
       loader.classList.remove('hidden');
       emptyState.classList.add('hidden');
       videoGrid.innerHTML = '';
+      currentSearchQuery = query;
+      nextPageToken = '';
     }
     
     const url = new URL('https://www.googleapis.com/youtube/v3/search');
@@ -110,14 +101,14 @@ async function searchYouTube(query, pageToken = '') {
     
     if (pageToken) {
       videosCache = [...videosCache, ...videos];
+      renderVideos(videos, false);
     } else {
       videosCache = videos;
+      renderVideos(videos, true);
     }
     
-    if (videosCache.length === 0) {
+    if (videosCache.length === 0 && !pageToken) {
       emptyState.classList.remove('hidden');
-    } else {
-      renderVideos(videos, !pageToken);
     }
     
     loader.classList.add('hidden');
@@ -125,6 +116,7 @@ async function searchYouTube(query, pageToken = '') {
     console.error('Error searching YouTube:', error);
     document.getElementById('empty-state').classList.remove('hidden');
     document.getElementById('loader').classList.add('hidden');
+    showToast('Error loading videos: ' + error.message);
   }
 }
 
@@ -142,68 +134,6 @@ function formatYouTubeVideos(items) {
   }));
 }
 
-async function loadDemoVideos() {
-  try {
-    const loader = document.getElementById('loader');
-    const emptyState = document.getElementById('empty-state');
-    const videoGrid = document.getElementById('video-grid');
-    
-    loader.classList.remove('hidden');
-    emptyState.classList.add('hidden');
-    videoGrid.innerHTML = '';
-    
-    const videos = getDemoVideos();
-    videosCache = videos;
-    
-    if (videos.length === 0) {
-      emptyState.classList.remove('hidden');
-    } else {
-      renderVideos(videos);
-    }
-    
-    loader.classList.add('hidden');
-  } catch (error) {
-    console.error('Error loading demo videos:', error);
-    document.getElementById('empty-state').classList.remove('hidden');
-  }
-}
-
-function getDemoVideos() {
-  // Demo videos for testing
-  return [
-    {
-      id: 'dQw4w9WgXcQ',
-      title: 'Welcome to My-Stream - YouTube Integration',
-      uploader: 'My-Stream Team',
-      thumbnail: 'https://images.unsplash.com/photo-1505228395891-9a51e7e86e81?w=300&h=170&fit=crop',
-      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      views: '1.2M',
-      duration: '3:33',
-      description: 'Welcome to My-Stream with YouTube API integration! Connect a real YouTube API key to load live videos.',
-    },
-    {
-      id: 'jNQXAC9IVRw',
-      title: 'Sample Video 2 - Demo Mode',
-      uploader: 'Demo Channel',
-      thumbnail: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&h=170&fit=crop',
-      url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-      views: '856K',
-      duration: '2:47',
-      description: 'This is a demo video. Get a YouTube API key to load real videos.',
-    },
-    {
-      id: '9bZkp7q19f0',
-      title: 'Sample Video 3 - YouTube API Demo',
-      uploader: 'Content Creator',
-      thumbnail: 'https://images.unsplash.com/photo-1498038432885-ccd8e8c352e5?w=300&h=170&fit=crop',
-      url: 'https://www.youtube.com/watch?v=9bZkp7q19f0',
-      views: '2.1M',
-      duration: '3:34',
-      description: 'Demo content for testing. Set up YouTube API in config for production.',
-    },
-  ];
-}
-
 function renderVideos(videos, clear = true) {
   const videoGrid = document.getElementById('video-grid');
   
@@ -217,7 +147,7 @@ function renderVideos(videos, clear = true) {
     videoItem.innerHTML = `
       <div class="video-thumbnail">
         <img src="${video.thumbnail}" alt="${video.title}" onerror="this.src='https://via.placeholder.com/300x170?text=Video'">
-        <span class="video-duration">${video.duration || 'N/A'}</span>
+        <span class="video-duration">${video.duration || 'LIVE'}</span>
       </div>
       <div class="mt-2">
         <h3 class="text-sm font-medium truncate">${video.title}</h3>
@@ -242,7 +172,7 @@ function playVideo(video) {
   document.getElementById('p-description').innerHTML = `<p class="text-sm text-gray-300">${video.description || 'No description available.'}</p>`;
   
   // Embed YouTube video
-  const embedUrl = `https://www.youtube.com/embed/${video.id}?autoplay=1`;
+  const embedUrl = `https://www.youtube.com/embed/${video.id}?autoplay=1&controls=1`;
   vidPlayer.innerHTML = `<iframe width="100%" height="100%" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
   
   playerOverlay.style.display = 'flex';
@@ -277,7 +207,7 @@ function expandPlayer() {
 }
 
 function toggleMiniPlay() {
-  // YouTube embed auto-plays, just toggle mini player visibility
+  // YouTube embed auto-plays
   showToast('Playing in mini player');
 }
 
@@ -285,32 +215,16 @@ function runSearch() {
   const query = document.getElementById('q-input').value.trim();
   
   if (!query) {
-    loadDemoVideos();
+    searchYouTube(CONFIG.DEFAULT_SEARCH);
     return;
   }
   
-  // If YouTube API is configured, search YouTube
-  if (CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
-    searchYouTube(query);
-  } else {
-    // Otherwise search in demo videos
-    const filtered = videosCache.filter((video) =>
-      video.title.toLowerCase().includes(query) ||
-      video.uploader.toLowerCase().includes(query) ||
-      video.description?.toLowerCase().includes(query)
-    );
-    renderVideos(filtered);
-  }
+  searchYouTube(query);
 }
 
 function goHome() {
   document.getElementById('q-input').value = '';
-  
-  if (CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
-    searchYouTube(CONFIG.DEFAULT_SEARCH);
-  } else {
-    loadDemoVideos();
-  }
+  searchYouTube(CONFIG.DEFAULT_SEARCH);
 }
 
 function loadSubs() {
@@ -420,12 +334,11 @@ function clearSubs() {
 }
 
 function showAbout() {
-  const apiStatus = CONFIG.YOUTUBE_API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE' ? 'Not configured' : 'Configured';
-  alert(`${CONFIG.APP_NAME} v${CONFIG.VERSION}\n\nA modern video streaming platform with YouTube integration.\n\nYouTube API: ${apiStatus}`);
+  alert(`${CONFIG.APP_NAME} v${CONFIG.VERSION}\n\nA modern video streaming platform powered by YouTube.\n\nSearch YouTube, save your favorites, and manage your subscriptions - all in one place.`);
 }
 
 function openDlPopup() {
-  document.getElementById('dl-popup').style.display = 'flex';
+  showToast('Download not available for YouTube videos');
 }
 
 function closeDlPopup() {
@@ -468,7 +381,7 @@ function shareFile() {
   if (navigator.share) {
     navigator.share({
       title: currentVideo.title,
-      text: `Check out: ${currentVideo.title} on My-Stream`,
+      text: `Check out: ${currentVideo.title}`,
       url: currentVideo.url,
     });
   } else {
@@ -477,7 +390,7 @@ function shareFile() {
 }
 
 function extractAudioShare() {
-  showToast('Audio extraction not available for YouTube videos');
+  showToast('Use YouTube\'s official download feature for audio');
 }
 
 function copyLink() {
@@ -531,10 +444,8 @@ function showToast(message) {
 window.addEventListener('scroll', () => {
   if (
     window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 &&
-    nextPageToken &&
-    CONFIG.YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE'
+    nextPageToken
   ) {
-    const query = document.getElementById('q-input').value || CONFIG.DEFAULT_SEARCH;
-    searchYouTube(query, nextPageToken);
+    searchYouTube(currentSearchQuery, nextPageToken);
   }
 });
